@@ -41,6 +41,8 @@ wss.on("connection", (client) => {
 
     switch (type) {
       case "create":
+        console.log("กำลังจะส่ง  create ไปที่ client", room);
+
         let roomNumber = generateUniqueRoomNumber();
         rooms[roomNumber] = {
           question: groupQuestion[0],
@@ -59,6 +61,8 @@ wss.on("connection", (client) => {
         );
         break;
       case "join":
+        console.log("กำลังจะส่ง  join ไปที่ client", room);
+
         if (rooms[room]) {
           rooms[room].client.add(client);
           client.room = room;
@@ -89,6 +93,8 @@ wss.on("connection", (client) => {
         break;
 
       case "message":
+        console.log("กำลังจะส่ง  message ไปที่ client", room);
+
         if (rooms[room]) {
           const clientsInRoom = rooms[room].client;
           if (clientsInRoom) {
@@ -111,6 +117,7 @@ wss.on("connection", (client) => {
         break;
 
       case "delete":
+        console.log("กำลังจะส่ง deleted ไปที่ client", room);
         if (rooms[room]) {
           rooms[room].client.forEach((c) => {
             if (c.readyState === WebSocket.OPEN) {
@@ -154,6 +161,7 @@ wss.on("connection", (client) => {
   });
 });
 
-server.listen(8080, () => {
+const port = process.env.PORT || 8080
+server.listen(port, () => {
   console.log("Server เริ่มที่ http://localhost:8080");
 });
