@@ -2,13 +2,24 @@
 import express from "express";
 import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
-import { deeptalk } from "./groupQuestion.js";
+import {
+  b2sclubdeeptalk10,
+  bestfriend22,
+  deeptalk36,
+  deeptalkfan50,
+} from "./groupQuestion.js";
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-const groupQuestion = [deeptalk];
+const groupQuestion = [
+  deeptalk36,
+  bestfriend22,
+  deeptalkfan50,
+  b2sclubdeeptalk10,
+];
+
 const rooms = {};
 
 const stringToObject = (str) => JSON.parse(str);
@@ -27,16 +38,21 @@ wss.on("connection", (client) => {
   console.log("Client Con nected!");
 
   client.on("message", (message) => {
-    const { type, room, msg } = stringToObject(message.toString());
+    const { type, room, msg, questionIndex } = stringToObject(
+      message.toString()
+    );
 
     switch (type) {
       case "create": {
         const roomNumber = generateUniqueRoomNumber();
         rooms[roomNumber] = {
-          question: groupQuestion[0],
+          question: groupQuestion[questionIndex],
           client: new Set(),
           host: client,
+          questionIndex: 0,
+          currentMessage: "",
         };
+
         rooms[roomNumber].client.add(client);
         client.room = roomNumber;
         client.isHost = true;
@@ -77,6 +93,9 @@ wss.on("connection", (client) => {
       }
       case "message": {
         if (rooms[room]) {
+          rooms[room].questionIndex = msg;
+          rooms[room].currentMessage = rooms[room].question[msg];
+
           for (const c of rooms[room].client) {
             if (c.readyState === WebSocket.OPEN) {
               c.send(
@@ -110,6 +129,39 @@ wss.on("connection", (client) => {
         }
         break;
       }
+      case "success": {
+        console.log("success");
+
+        if (rooms[room]) {
+          for (const c of rooms[room].client) {
+            if (c.readyState === WebSocket.OPEN) {
+              c.send(objectToString({ type: "success", room }));
+            }
+          }
+          delete rooms[room];
+        }
+        break;
+      }
+      case "reconnect": {
+        if (rooms[room]) {
+          rooms[room].client.add(client);
+          client.room = room;
+          client.isHost = false;
+
+          client.send(
+            objectToString({
+              type: "reconnected",
+              room,
+              questionLength: rooms[room].question.length,
+              currentMessage: rooms[room].currentMessage,
+              questionIndex: rooms[room].questionIndex,
+            })
+          );
+        } else {
+          client.send(objectToString({ type: "error", msg: "ห้องไม่พบ!" }));
+        }
+        break;
+      }
     }
   });
 
@@ -132,7 +184,8 @@ wss.on("connection", (client) => {
             c.send(objectToString({ type: "deleted", room }));
           }
         }
-        delete rooms[room];
+        console.log(`Host ของห้อง ${room} ออกจากระบบ`);
+        rooms[room].host = null;
         console.log(`Room ${room} ถูกลบเพราะ host ออก`);
       } else if (rooms[room].client.size === 0) {
         delete rooms[room];
