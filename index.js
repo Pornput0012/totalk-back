@@ -6,7 +6,8 @@ import {
   b2sclubdeeptalk10,
   bestfriend22,
   deeptalk36,
-  deeptalkfan50,
+  deeptalkfan,
+  deeptalkSituationship,
 } from "./groupQuestion.js";
 
 const app = express();
@@ -16,8 +17,9 @@ const wss = new WebSocketServer({ server });
 const groupQuestion = [
   deeptalk36,
   bestfriend22,
-  deeptalkfan50,
+  deeptalkfan,
   b2sclubdeeptalk10,
+  deeptalkSituationship,
 ];
 
 const rooms = {};
@@ -51,6 +53,7 @@ wss.on("connection", (client) => {
           host: client,
           questionIndex: 0,
           currentMessage: "",
+          history: [], // เก็บประวัติคำถามที่ถูกถามแล้ว
         };
 
         rooms[roomNumber].client.add(client);
@@ -78,6 +81,8 @@ wss.on("connection", (client) => {
               type: "joined",
               room,
               questionLength: rooms[room].question.length,
+              history: Array.from(rooms[room].history || []), // ส่งประวัติคำถามที่ถูกถามแล้ว
+              lastQuestion: rooms[room].currentMessage, // ส่งคำถามล่าสุด
             })
           );
 
@@ -91,23 +96,48 @@ wss.on("connection", (client) => {
         }
         break;
       }
+
       case "message": {
         if (rooms[room]) {
           rooms[room].questionIndex = msg;
           rooms[room].currentMessage = rooms[room].question[msg];
 
-          for (const c of rooms[room].client) {
-            if (c.readyState === WebSocket.OPEN) {
-              c.send(
-                objectToString({
-                  type: "message",
-                  room,
-                  msg: rooms[room].question[msg],
-                  number: msg,
-                })
-              );
-            }
+          // เพิ่มหมายเลขคำถามลงในประวัติ
+          if (!rooms[room].history) {
+            rooms[room].history = [];
           }
+          rooms[room].history.push(msg);
+
+          // สุ่มว่าใครจะเป็นคนเริ่มก่อน (isBeing)
+          // สร้างรายชื่อผู้เล่นที่ active อยู่
+          const activeClients = Array.from(rooms[room].client).filter(
+            (c) => c.readyState === WebSocket.OPEN
+          );
+
+          // สุ่มเลือกตำแหน่งของผู้เล่นที่จะเริ่มก่อน
+          const randomPlayerIndex = Math.floor(
+            Math.random() * activeClients.length
+          );
+
+          // ส่งข้อมูลให้ผู้เล่นทุกคนที่ active
+          activeClients.forEach((client, index) => {
+            // เช็คว่าเป็นผู้เล่นที่ถูกสุ่มเลือกให้เริ่มก่อนหรือไม่
+            console.log(index);
+            
+            const isBeing = index === randomPlayerIndex;
+            console.log(isBeing);
+            
+
+            client.send(
+              objectToString({
+                type: "message",
+                room,
+                msg: rooms[room].question[msg],
+                number: msg,
+                isBeing, // ค่า isBeing จะเป็น true เฉพาะผู้เล่นที่ถูกสุ่มเลือก
+              })
+            );
+          });
         } else {
           client.send(objectToString({ type: "error", msg: "ห้องไม่พบ!" }));
         }
@@ -155,6 +185,7 @@ wss.on("connection", (client) => {
               questionLength: rooms[room].question.length,
               currentMessage: rooms[room].currentMessage,
               questionIndex: rooms[room].questionIndex,
+              history: Array.from(rooms[room].history || []), // ส่งประวัติคำถามด้วยเมื่อ reconnect
             })
           );
         } else {
@@ -171,23 +202,30 @@ wss.on("connection", (client) => {
 
     if (room && rooms[room]) {
       rooms[room].client.delete(client);
-
+      // ลบ client ออกจากห้อง
       for (const c of rooms[room].client) {
         if (c.readyState === WebSocket.OPEN) {
-          c.send(objectToString({ type: "disconnect", room }));
+          c.send(
+            objectToString({
+              type: "disconnect",
+              room,
+              noUser: rooms[room]?.client.size,
+            })
+          );
         }
       }
-
+      // ถ้า host ออกให้ลบห้องทิ้ง
       if (client === rooms[room].host) {
-        for (const c of rooms[room].client) {
-          if (c.readyState === WebSocket.OPEN) {
-            c.send(objectToString({ type: "deleted", room }));
-          }
-        }
+        // for (const c of rooms[room].client) {
+        //   if (c.readyState === WebSocket.OPEN) {
+        //     c.send(objectToString({ type: "deleted", room }));
+        //   }
+        // }
         console.log(`Host ของห้อง ${room} ออกจากระบบ`);
         rooms[room].host = null;
-        console.log(`Room ${room} ถูกลบเพราะ host ออก`);
-      } else if (rooms[room].client.size === 0) {
+      }
+      // ถ้าไม่มี client ให้ลบทิ้ง
+      else if (rooms[room].client.size === 0) {
         delete rooms[room];
         console.log(`Room ${room} ถูกลบเพราะไม่มีผู้ใช้งาน`);
       }
