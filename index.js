@@ -5,9 +5,17 @@ import { WebSocketServer, WebSocket } from "ws";
 import {
   b2sclubdeeptalk10,
   bestfriend22,
+  classicTruth,
   deeptalk36,
   deeptalkfan,
   deeptalkSituationship,
+  Dirty_Questions_That_Will_Turn_You_Both_On_50,
+  DirtyTruth,
+  Fun_Dirty_Questions_to_Ask_Your_Partner_75,
+  Have_You_Ever_Sex_Questions,
+  Sex_Questions_To_Ask_Friends,
+  Sex_Questions_To_Get_To_Know_Your_Partner,
+  Sex_Questions_To_Reveal_Turn_Ons,
 } from "./groupQuestion.js";
 
 const app = express();
@@ -20,6 +28,17 @@ const groupQuestion = [
   deeptalkfan,
   b2sclubdeeptalk10,
   deeptalkSituationship,
+  classicTruth,
+];
+
+const groupQuestionRedZone = [
+  Fun_Dirty_Questions_to_Ask_Your_Partner_75,
+  Dirty_Questions_That_Will_Turn_You_Both_On_50,
+  DirtyTruth,
+  Sex_Questions_To_Get_To_Know_Your_Partner,
+  Sex_Questions_To_Reveal_Turn_Ons,
+  Have_You_Ever_Sex_Questions,
+  Sex_Questions_To_Ask_Friends,
 ];
 
 const rooms = {};
@@ -40,7 +59,7 @@ wss.on("connection", (client) => {
   console.log("Client Con nected!");
 
   client.on("message", (message) => {
-    const { type, room, msg, questionIndex } = stringToObject(
+    const { type, room, msg, questionIndex, isRedzone } = stringToObject(
       message.toString()
     );
 
@@ -48,7 +67,9 @@ wss.on("connection", (client) => {
       case "create": {
         const roomNumber = generateUniqueRoomNumber();
         rooms[roomNumber] = {
-          question: groupQuestion[questionIndex],
+          question: isRedzone
+            ? groupQuestionRedZone[questionIndex]
+            : groupQuestion[questionIndex],
           client: new Set(),
           host: client,
           questionIndex: 0,
@@ -123,10 +144,9 @@ wss.on("connection", (client) => {
           activeClients.forEach((client, index) => {
             // เช็คว่าเป็นผู้เล่นที่ถูกสุ่มเลือกให้เริ่มก่อนหรือไม่
             console.log(index);
-            
+
             const isBeing = index === randomPlayerIndex;
             console.log(isBeing);
-            
 
             client.send(
               objectToString({
